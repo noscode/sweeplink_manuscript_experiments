@@ -54,27 +54,3 @@ slim path: slim
 """
             with open(os.path.join(sim_dir, f"example_config_val_{char_val}.yaml"), "w") as f:
                 f.write(yaml_content)
-
-def generate_simulation_slurm(char_name, n_cores=32, submit=False):
-    char_values = config.get_char_config(char_name)['values']
-    experiment_dir = config.get_experiment_dir(char_name)
-    slurm_path = os.path.join(experiment_dir, f"run_simulations_{char_name}.sh")
-    
-    with open(slurm_path, "w") as f:
-        f.write("#!/bin/bash -l\n")
-        f.write(f"#SBATCH --error=simulation_{char_name}.err\n#SBATCH --output=simulation_{char_name}.out\n")
-        f.write(f"#SBATCH --mem=80000\n#SBATCH --time=100:0:0\n")
-        f.write(f"#SBATCH --job-name sim_{char_name}\n#SBATCH --cpus-per-task={n_cores}\n")
-        f.write("#SBATCH --partition=pibu_el8\n\n")
-        f.write(f"NTHREADS={n_cores}\nconda activate timesweeper_env\n\n")
-        
-        for char_val in char_values:
-            sel_list = config.get_sim_sel_list(char_name, char_val)
-            for sel in sel_list:
-                f.write(f"cd timesweeper_sims/true_s_{sel}/configs\n")
-                f.write(f"timesweeper sim_custom --threads $NTHREADS -y example_config_val_{char_val}.yaml\n")
-                f.write("cd ../../..\n\n")
-
-    if submit:
-        print(f"\nSubmitting simulation job to the cluster (using {n_cores} cores)...")
-        subprocess.run(["sbatch", f"--exclude={config.SLURM_EXCLUDE}", os.path.basename(slurm_path)], cwd=experiment_dir)

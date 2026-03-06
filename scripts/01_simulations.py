@@ -1,6 +1,6 @@
 import sys, os, argparse
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from sweeplink_exp import config, simulator
+from sweeplink_exp import config, simulator, slurm
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--char', required=True)
@@ -10,4 +10,4 @@ args = parser.parse_args()
 
 slim_template = os.path.join(os.path.dirname(__file__), "..", "templates", "timesweeper_model.slim")
 simulator.generate_simulation_files(args.char, slim_template)
-simulator.generate_simulation_slurm(args.char, n_cores=args.n_cores, submit=args.submit)
+slurm.generate_simulation_slurm(args.char, n_cores=args.n_cores, submit=args.submit)
