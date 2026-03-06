@@ -1,4 +1,5 @@
 from . import config, results, metrics
+import numpy as np
 
 def print_metrics(data, threshold, score_is_pval=False):
     """
@@ -75,3 +76,29 @@ def process_and_print_results_per_char_value(char_name, n_total):
                 threshold=config.THRESHOLDS['sweeplink'],
                 score_is_pval=False
             )
+
+def process_and_print_intermediate_results(char_name, char_val, ind, is_comparison):
+    char_config = config.get_char_config(char_name)
+    sel_list = config.SIM_MAIN_LIST_WITH_0
+
+    # selection
+    data = results.get_data_per_s_for_ind(char_name, char_val, sel_list, ind, is_comparison, s_trace_file=True)
+    metrics_data = metrics.calculate_metrics(
+        parsed_data=data,
+        sel_list=sel_list,
+        threshold=config.THRESHOLDS['sweeplink'],
+        score_is_pval=False,
+    )
+    for sel in sel_list:
+        print(f"\nSelection: {sel}")
+        print_metrics(
+            data=metrics_data[sel],
+            threshold=config.THRESHOLDS['sweeplink'],
+            score_is_pval=False
+        )
+
+    # Pop size
+    posterior = results.get_trace_data_for_ind(char_name, char_val, ind, is_comparison)['N_pop0']
+    posterior = np.array(posterior)
+    posterior = posterior[~np.isnan(posterior)]
+    print(f"\nPopulation size: {np.mean(posterior):.1f} +- {np.std(posterior):.1f}")

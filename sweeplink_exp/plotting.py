@@ -96,8 +96,6 @@ def draw_master_plot(char_name, threshold, save_file, n_total):
     posterior_samples = {val: results.get_trace_data_accross_repeats(char_name, val, n_total=100) for val in char_values}
 
     # Draw the violins exactly at the x_centers
-    for val in char_values:
-        print(val, np.isnan(np.array(posterior_samples[val]["log10N_pop0"])).any())
     vplot = ax3.violinplot([posterior_samples[val]["log10N_pop0"] for val in char_values], positions=x_centers, showmedians=True, showextrema=True)
 
     # Format the violins (Neutral light gray)

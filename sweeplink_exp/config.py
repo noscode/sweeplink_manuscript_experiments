@@ -168,7 +168,7 @@ characteristics_list = [
     },
     {
         'name': 'n_grid',
-        'values': [75],
+        'values': [10, 20, 50, 75, 100],
         'x_label': 'Grid size',
         'xlog': False,
         'default_value': 50,
