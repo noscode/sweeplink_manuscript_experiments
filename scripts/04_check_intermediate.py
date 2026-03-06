@@ -7,7 +7,11 @@ parser.add_argument('--char', required=True)
 parser.add_argument('--val', required=True, help="Value of characteristic")
 parser.add_argument('--sim', required=True, help="Simulation index")
 args = parser.parse_args()
-args.val = int(args.val)
+
+try:
+    args.val = int(args.val)
+except:
+    args.val = float(args.val)
 
 printing.process_and_print_intermediate_results(
     char_name=args.char,
