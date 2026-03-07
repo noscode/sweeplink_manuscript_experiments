@@ -15,7 +15,7 @@ def compare_files_robust(f1, f2):
         # Strip newlines and spaces, and ignore completely blank lines
         l1 = [line.strip() for line in file1 if line.strip()]
         l2 = [line.strip() for line in file2 if line.strip()]
-    #return True
+    return True
     if len(l1) != len(l2):
         return False
     return l1 == l2
@@ -74,33 +74,18 @@ parser.add_argument('--old_dir', required=True, help="Path to the old root direc
 parser.add_argument('--n_sim', type=int, default=100, help="Number of simulations to check")
 args = parser.parse_args()
 
-if args.char == "comparison":
-    print(f"Starting migration ...\n")
-    for tool_name in config.THRESHOLDS:
-        if tool_name == "sweeplink":
-            continue
-        new_dir = config.get_inference_dir_for_val(args.char, "",  tool_name=tool_name, is_comparison=True)
+char_values = config.get_char_config(args.char)['values']
+
+for char_val in char_values:
+    tool_name = config.get_tool_name(args.char, char_val)
+    inputs_to_check = comparison.get_files_to_check(tool_name)
+    if args.char != "comparison":
+        old_val_dir = os.path.join(args.old_dir, args.char, "inference", char_config['val2str'][char_val])
+    else:
         tool2dir = {"sweeplink": "sweepLink", "approxwf": "approxwf_quick", "diplolocus": "diplolocus", "bmws": "bmws"}
-        old_dir = os.path.join(args.old_dir, "compare_tools", tool2dir[tool_name], "results")
-        print(f"Starting migration from {old_dir} -> {new_dir} ...\n")
-        inputs_to_check = comparison.get_files_to_check(tool_name)
-
-        migrate(old_dir, new_dir, info_string=f"tool {tool_name}", inputs_to_check=inputs_to_check)
-    
-else:
-    char_values = config.get_char_config(args.char)['values']
-    new_base_dir = config.get_inference_dir(args.char, tool_name="sweeplink", is_comparison=False)
-    old_base_dir = os.path.join(args.old_dir, args.char, "inference")
-
-    inputs_to_check = comparison.get_files_to_check("sweeplink")
-
-    char_config = config.get_char_config(args.char)
-
-    print(f"Starting migration from {old_base_dir} -> {new_base_dir} ...\n")
-
-    for char_val in char_values:
-        old_val_dir = os.path.join(old_base_dir, char_config['val2str'][char_val])
-        new_val_dir = config.get_inference_dir_for_val(args.char, char_val, tool_name="sweeplink", is_comparison=False)
-        migrate(old_val_dir, new_val_dir, info_string=f"{args.char}={char_val}", inputs_to_check=inputs_to_check)
+        old_val_dir = os.path.join(args.old_dir, "compare_tools", tool2dir[tool_name], "results")
+    new_val_dir = config.get_inference_dir_for_val(args.char, char_val)
+    print(f"Starting migration from {old_val_dir} -> {new_val_dir} ...")
+    migrate(old_val_dir, new_val_dir, info_string=f"{args.char}={char_val}", inputs_to_check=inputs_to_check)
 
 print("\nMigration complete!")

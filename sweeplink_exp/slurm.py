@@ -28,12 +28,12 @@ def generate_simulation_slurm(char_name, n_cores=32, submit=False):
         subprocess.run(["sbatch", f"--exclude={config.SLURM_EXCLUDE}", os.path.basename(slurm_path)], cwd=experiment_dir)
 
 
-def generate_inference_slurm(char_name, char_values, n_start, n_sim, n_cores, tool_name, is_comparison=False, submit=False):
-    inference_base = config.get_inference_dir(
-        char_name=char_name,
-        tool_name=tool_name,
-        is_comparison=is_comparison
-    )
+def generate_inference_slurm(char_name, char_values, n_start, n_sim, n_cores, submit=False):
+    if len(char_values) > 1:
+        inference_base = config.get_inference_dir(char_name)
+    else:
+        # if one value then we will go deeper in output files
+        inference_base = config.get_inference_dir_for_val(char_name, char_values[0])
     run_files_dir = os.path.join(inference_base, "run_files")
     os.makedirs(os.path.join(run_files_dir, "output"), exist_ok=True)
 
@@ -43,17 +43,13 @@ def generate_inference_slurm(char_name, char_values, n_start, n_sim, n_cores, to
         out_dir = config.get_inference_dir_for_val(
             char_name=char_name,
             char_val=char_val,
-            tool_name=tool_name,
-            is_comparison=is_comparison
         )
         for sim in range(n_sim):
             actual_sim_idx = n_start + sim
             should_run = not comparison.is_finished(
-                tool_name=tool_name,
-                ind=actual_sim_idx,
                 char_name=char_name,
                 char_val=char_val,
-                is_comparison=is_comparison
+                ind=actual_sim_idx,
             )
             if should_run:
                 sim_dir = os.path.join(out_dir, str(actual_sim_idx))

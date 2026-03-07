@@ -1,72 +1,29 @@
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 from . import config, results, metrics
 
-def draw_master_plot(char_name, threshold, save_file, n_total):
-    sel_list = config.SIM_MAIN_LIST
-    char_config = config.get_char_config(char_name)
-    char_values = char_config["values"]
 
-    # 1. Load data
-    aggregated_data = {}
-    for char_val in char_values:
-        aggregated_data[char_val] = results.get_data_per_s_accross_repeats(
-            char_name=char_name,
-            char_val=char_val,
-            sel_list=config.SIM_MAIN_LIST_WITH_0,
-            n_total=n_total,
-        )
-
-    # 2. Setup figure
-    fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
-    x_centers = np.arange(len(char_values))
-
-    # Panel A: draw TPR and FPR
-    ax1 = axes[0]
-    # get TPR, FPR and metrics
-    metrics_data = {}
-    TPR_y_data_per_sel = {sel: []  for sel in sel_list}
-    FPR_y_data = []
-    for char_val in char_values:
-        TPR_dict, FPR, metrics_per_val = metrics.get_TPR_per_sel_and_FPR(
-            parsed_data=aggregated_data[char_val],
-            sel_list=[0.0] + sel_list,
-            threshold=config.THRESHOLDS["sweeplink"],
-            score_is_pval=False,
-            return_metrics=True
-        )
-        for sel in sel_list:
-            TPR_y_data_per_sel[sel].append(TPR_dict[sel])
-        FPR_y_data.append(FPR)
-        metrics_data[char_val] = metrics_per_val
-    # draw
-    for i, sel in enumerate(sel_list):
-        ax1.plot(x_centers, TPR_y_data_per_sel[sel], marker='o', color=config.SEL_COLORS[sel], 
-                 linewidth=2.5, markersize=8, label=rf"TPR, $s = {sel}$", zorder=config.SEL_ZORDER[sel])
-
-    # Plot FPR Line & Shaded Area
-    ax1.fill_between(x_centers, 0, FPR_y_data, color='gray', alpha=0.2, zorder=1)
-    ax1.plot(x_centers, FPR_y_data, color='black', linestyle='--', linewidth=2.5, label='FPR', zorder=1)
-
-    ax1.set_ylim(-0.05, 1.05)
-    ax1.set_ylabel("Power (TPR or FPR)")
-    ax1.set_title(f"(A) Detection Power and FPR {char_config['title']}", loc='left')
-    ax1.legend(loc="lower right", prop={"size": 8})
-
-    # Panel B: relative error to predict selection
-    ax2 = axes[1]
-
-    box_width = 0.2
-    offsets = {0.01: -box_width, 0.02: 0, 0.05: box_width}
+def plot_boxplots(ax, x_centers, sel_list, metrics_data, char_values, relative_error=True):
+    box_width = 0.6 / len(sel_list)
+    offsets = {sel: (i - len(sel_list) // 2) * box_width for i, sel in enumerate(sel_list)}
 
     for sel in sel_list:
-        pred_data = {val: metrics.get_error(metrics_data[val][sel]["raw_sig_preds"], sel) if len(metrics_data[val][sel]["raw_sig_preds"]) > 2 else [] for val in char_values}
+        pred_data = {}
+        for val in char_values:
+            if len(metrics_data[val][sel]["raw_sig_preds"]) > 2:
+                if relative_error:
+                    pred_data[val] = metrics.get_error(metrics_data[val][sel]["raw_sig_preds"], sel)
+                else:
+                    pred_data[val] = metrics_data[val][sel]["raw_sig_preds"]
+            else:
+                pred_data[val] = []
 
         # Calculate exact x positions for this specific selection coefficient
         positions = x_centers + offsets[sel]
 
         # Draw the boxplot (manage_ticks=False prevents it from messing up our X-axis)
-        bplot = ax2.boxplot(
+        bplot = ax.boxplot(
             [pred_data[val] for val in char_values],
             positions=positions,
             widths=box_width*0.8,
@@ -85,9 +42,85 @@ def draw_master_plot(char_name, threshold, save_file, n_total):
             median.set_linewidth(1.5)
 
     # Perfect estimation reference line
-    ax2.axhline(0, color='black', linestyle='--', linewidth=1, zorder=0)
+    if relative_error:
+        ax.axhline(0, color='black', linestyle='--', linewidth=1, zorder=0)
+        ax.set_ylabel(r"Relative Error of $\hat{s}$")
+        ax.set_ylim(-1, 1)
+    else:
+        for sel in sel_list:
+            ax.axhline(sel, color=config.SEL_COLORS[sel], linestyle='--', linewidth=1, zorder=0)
+            if sel != 0:
+                ax.axhline(-sel, color='grey', linestyle='--', linewidth=0.5, zorder=0)
+            ax.axhline(-0.06, color='grey', linestyle='--', linewidth=0.5, zorder=0)
+            ax.axhline(0.06, color='grey', linestyle='--', linewidth=0.5, zorder=0)
+        ax.set_ylabel(r"Predicted $\hat{s}$ (significant)")
+        ax.set_ylim(-0.065, 0.065)
 
-    ax2.set_ylabel(r"Relative Error of $\hat{s}$")
+
+def draw_master_plot(char_name, save_file, n_total):
+    sel_list = config.SIM_MAIN_LIST
+    char_config = config.get_char_config(char_name)
+    char_values = char_config["values"]
+
+    # 1. Load data
+    aggregated_data = {}
+    for char_val in char_values:
+        aggregated_data[char_val] = results.get_data_per_s_accross_repeats(
+            char_name=char_name,
+            char_val=char_val,
+            n_total=n_total,
+        )
+
+    # 2. Setup figure
+    fig, axes = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
+    x_centers = np.arange(len(char_values))
+
+    # Panel A: draw TPR and FPR
+    ax1 = axes[0]
+    # get TPR, FPR and metrics
+    metrics_data = {}
+    TPR_y_data_per_sel = {sel: []  for sel in sel_list}
+    FPR_y_data = []
+    for char_val in char_values:
+        tool_name = config.get_tool_name(char_name, char_val)
+        TPR_dict, FPR, metrics_per_val = metrics.get_TPR_per_sel_and_FPR(
+            parsed_data=aggregated_data[char_val],
+            sel_list=[0.0] + sel_list,
+            threshold=config.THRESHOLDS[tool_name],
+            score_is_pval=config.IS_PVAL[tool_name],
+            return_metrics=True
+        )
+        for sel in sel_list:
+            TPR_y_data_per_sel[sel].append(TPR_dict[sel])
+        FPR_y_data.append(FPR)
+        metrics_data[char_val] = metrics_per_val
+    # draw
+    for i, sel in enumerate(sel_list):
+        ax1.plot(x_centers, TPR_y_data_per_sel[sel], marker='o', color=config.SEL_COLORS[sel], 
+                 linewidth=2.5, markersize=8, label=rf"$s = {sel}$", zorder=config.SEL_ZORDER[sel])
+
+    # Plot FPR Line & Shaded Area
+    ax1.fill_between(x_centers, 0, FPR_y_data, color='gray', alpha=0.2, zorder=1)
+    ax1.plot(x_centers, FPR_y_data, color='black', linestyle='--', linewidth=2.5, zorder=1)
+
+    # Add the label
+    ax1.annotate('FPR',
+            xy=(x_centers[-1], FPR_y_data[-1]),          # Anchor exactly to the last data point
+            xytext=(0, 1),              # Offset text vertically by 1 point
+            textcoords='offset points', # Tells matplotlib to use point offsets
+            color='black',
+            fontsize=8,
+            va='bottom',                # Sits above the offset point
+            ha='right')                 # Aligns it nicely to the right edge
+
+    ax1.set_ylim(-0.05, 1.05)
+    ax1.set_ylabel("Power (TPR or FPR)")
+    ax1.set_title(f"(A) Detection Power and FPR {char_config['title']}", loc='left')
+    ax1.legend(loc="center right", prop={"size": 8})
+
+    # Panel B: relative error to predict selection
+    ax2 = axes[1]
+    plot_boxplots(ax2, x_centers, sel_list, metrics_data, char_values, relative_error=True)
     ax2.set_title(r"(B) Estimation Accuracy of $\hat{s}$ " + f"{char_config['title']}", loc='left')
 
     # Panel C: violin plots of population size
@@ -109,8 +142,6 @@ def draw_master_plot(char_name, threshold, save_file, n_total):
         vp = vplot[partname]
         vp.set_edgecolor('black')
         vp.set_linewidth(1)
-
-    ax2.set_ylim(-1, 1)
 
     # True Ne reference line
     ax3.axhline(4.0, color='black', linestyle='--', linewidth=1, label='True $N_e$', zorder=0)
@@ -137,6 +168,146 @@ def draw_master_plot(char_name, threshold, save_file, n_total):
                        color='#E6F3FF', alpha=0.8, zorder=-1)
 
     # Ensure panels don't overlap
+    plt.tight_layout()
+
+    if save_file is not None:
+        plt.savefig(save_file)
+    else:
+        plt.show()
+
+
+def draw_absolute_boxplots(char_name, save_file, n_total):
+    sel_list = [0.0] + config.get_sel_list(char_name)
+    char_config = config.get_char_config(char_name)
+    char_values = char_config["values"]
+
+    # 1. Load data
+    metrics_data = {}
+    for char_val in char_values:
+        tool_name = config.get_tool_name(char_name, char_val)
+        aggregated_data = results.get_data_per_s_accross_repeats(
+            char_name=char_name,
+            char_val=char_val,
+            n_total=n_total,
+        )
+        metrics_data[char_val] = metrics.calculate_metrics(
+            parsed_data=aggregated_data,
+            sel_list=sel_list,
+            threshold=config.THRESHOLDS[tool_name],
+            score_is_pval=config.IS_PVAL[tool_name],
+        )
+
+    # 2. Setup figure
+    fig, ax = plt.subplots(1, 1, figsize=(8, 2))
+    x_centers = np.arange(len(char_values))
+
+    plot_boxplots(ax, x_centers, sel_list, metrics_data, char_values, relative_error=False)
+    # create legend
+    legend_handles = [
+        mpatches.Patch(color=config.SEL_COLORS[sel], label=fr"$s={sel}$")
+        for sel in sel_list
+    ]
+    plt.legend(
+        handles=legend_handles,
+        title="True Selection",
+        bbox_to_anchor=(1.05, 1), # Moves legend outside the plot
+        loc='upper left',         # Coordinates relative to the box
+        borderaxespad=0.          # Padding
+    )
+
+    ax.set_xticks(x_centers)
+    ax.set_xticklabels(char_values)
+    ax.set_xlabel(char_config['x_label'])
+
+    plt.tight_layout()
+
+    if save_file is not None:
+        plt.savefig(save_file)
+        print(f"Saved to {save_file}")
+    else:
+        plt.show()
+
+
+def draw_MCC_plot(char_name, save_file, n_total):
+    char_values = config.get_char_config(char_name)["values"]
+    sel_list = config.get_sel_list(char_name)
+
+    # 1. Load data
+    aggregated_data = {}
+    for char_val in char_values:
+        aggregated_data[char_val] = results.get_data_per_s_accross_repeats(
+        char_name=char_name,
+            char_val=char_val,
+            n_total=n_total,
+        )
+
+    # 2. Create grid and figure
+    fig, ax = plt.subplots(figsize=(4, 2.7))
+    ax.set_ylim([-0.05, 1.05])
+    limit = 8
+    grid = np.concatenate([[0], np.geomspace(10**(-limit), 1.0, 100)])
+
+    x_axis = grid
+
+    best_results = {}
+
+    for i, char_val in enumerate(char_values):
+        tool_name = config.get_tool_name(char_name, char_val)
+        y_data = []
+        for thr in grid:
+            thr_upd = thr
+            if not config.IS_PVAL[tool_name]:
+                thr_upd = 1 - thr
+            y_data.append(metrics.get_MCC(
+                parsed_data=aggregated_data[char_val],
+                sel_list=[0.0] + sel_list,
+                threshold=thr_upd,
+                score_is_pval=config.IS_PVAL[tool_name],
+            ))
+        if char_name == "comparison":
+            color = config.TOOL_COLORS[tool_name]
+            zorder = config.TOOL_ZORDER[tool_name]
+            label = config.TOOL_LABELS[tool_name]
+        else:
+            color = config.TAB_CMAP(i)
+            zorder = i
+            label = f"{char_name}: {char_val}"
+        plt.plot(x_axis, y_data, color=color, zorder=zorder, label=label)
+
+        ind = np.argmax(y_data)
+        best_results[tool_name] = [x_axis[ind], y_data[ind]]
+        
+        plt.plot(x_axis[ind], y_data[ind], color=color, zorder=zorder, marker="o", markersize=5)
+
+        if config.IS_PVAL[tool_name]:
+            p_string = f"pval={x_axis[ind]: .1e}"
+        else:
+            p_string = r"P=" + f"{1 - x_axis[ind]: .2f}"
+        ax.annotate(f"MCC={y_data[ind]:.2f}\n{p_string}",
+                    xy=(x_axis[ind], y_data[ind]),
+                    xytext=(-4, 2),
+                    textcoords='offset points',
+                    fontsize=6,
+                    color=color,
+                    fontweight='bold',
+                    ha='right',       # <--- ALIGN TEXT TO THE RIGHT
+                    va='bottom',      # Vertical alignment
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+
+    for tool in best_results:
+        print(tool, best_results[tool])
+
+    plt.xscale('symlog', linthresh=10 ** (-limit))
+    ticks = [1.0, 1e-1, 1e-3, 1e-5, 1e-7, 0.0]
+    labels = ["1", r"$10^{-1}$", r"$10^{-3}$", r"$10^{-5}$", r"$10^{-7}$", "0"]
+    plt.xticks(ticks, labels=labels)
+
+    plt.xlim(1.05, 0.0)
+    ax.set_xlabel(r"Significance Threshold (p-value or $1−P$)")
+    ax.set_ylabel("Detection Power (MCC)")
+
+    ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=False)
+
     plt.tight_layout()
 
     if save_file is not None:

@@ -72,7 +72,6 @@ def get_error(y_pred, true_val):
 
 def get_TPR_per_sel_and_FPR(parsed_data, sel_list, threshold, score_is_pval=False, return_metrics=True):
     assert 0.0 in sel_list
-    # 1. get FPR for s=0.0
     metrics = calculate_metrics(
         parsed_data=parsed_data,
         sel_list=sel_list,
@@ -81,7 +80,7 @@ def get_TPR_per_sel_and_FPR(parsed_data, sel_list, threshold, score_is_pval=Fals
     )
     # 2. get TPR for each s
     TPR = {}
-    for sel in sel_list:
+    for sel in set(sel_list):
         if sel == 0.0:
             FPR = metrics[sel]["n_sig"] / metrics[sel]["n_total"] if metrics[sel]["n_total"] > 0 else 0
         else:
@@ -89,3 +88,33 @@ def get_TPR_per_sel_and_FPR(parsed_data, sel_list, threshold, score_is_pval=Fals
     if return_metrics:
         return TPR, FPR, metrics
     return TPN, FPR
+
+def get_MCC(parsed_data, sel_list, threshold, score_is_pval=False, return_metrics=False):
+    assert 0.0 in sel_list
+
+    metrics = calculate_metrics(
+        parsed_data=parsed_data,
+        sel_list=sel_list,
+        threshold=threshold,
+        score_is_pval=score_is_pval
+    )
+
+    TP, FP, TN, FN = 0, 0, 0, 0
+    for sel in sel_list:
+        if sel == 0.0:
+            TN += metrics[sel]["n_total"] - metrics[sel]["n_sig"]
+            FP += metrics[sel]["n_sig"]
+        else:
+            TP += metrics[sel]["n_sig"]
+            FN += metrics[sel]["n_total"] - metrics[sel]["n_sig"]
+
+    # Formula for MCC: (TP*TN - FP*FN) / sqrt((TP+FP)(TP+FN)(TN+FP)(TN+FN))
+    numerator = (TP * TN) - (FP * FN)
+    denominator = np.sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+
+    # Handle edge case: if denominator is 0, MCC is defined as 0
+    if denominator == 0:
+        return 0.0
+    if return_metrics:
+        return numerator / denominator, metrics
+    return numerator / denominator

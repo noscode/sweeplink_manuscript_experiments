@@ -38,12 +38,17 @@ SIM_MAIN_LIST_WITH_0 = [0.0, 0.01, 0.02, 0.05]
 SIM_COMPARE_LIST = [0.01, 0.02, 0.03, 0.04, 0.05]
 COMPARE_SEL_LIST = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
 COMPARE_N_SIM = 100
-
 THRESHOLDS = {
     'sweeplink': 1.00,    # Probability threshold
-    'approxwf': 0.99,     # Probability threshold
-    'diplolocus': 0.0004,  # P-value threshold
-    'bmws': 0.0004,
+    'approxwf': 0.847778096527895,     # Probability threshold
+    'diplolocus': 7.56463327554629e-05,  # P-value threshold
+    'bmws': 0.0031257158496882415,
+}
+IS_PVAL = {
+    'sweeplink': False,
+    'approxwf': False,
+    'diplolocus': True,
+    'bmws': True,
 }
 
 def get_sim_sel_list(char_name, val):
@@ -66,10 +71,9 @@ def get_chrom_name(i_chrom, sel, scenario):
 def get_sel_from_chrom_name(chrom_name):
     return float(chrom_name.split("_")[2])
 
-def get_sel_scenario_combinations(is_comparison=False):
-    """If is_comparison=True, returns 10 chromosomes. Else, returns 6."""
-    sel_list = SIM_COMPARE_LIST if is_comparison else SIM_MAIN_LIST
-    sources =[]
+def get_sel_scenario_combinations(char_name):
+    sel_list = get_sel_list(char_name)
+    sources = []
     for s in sel_list:
         sources.append({"true_s": s, "scenario": "sdn"})
         sources.append({"true_s": s, "scenario": "neut"})
@@ -96,15 +100,15 @@ def get_s_grid_bounds():
 # --- PLOTTING ---
 # For master plots (sweeplink only)
 VIRIDIS_CMAP = plt.get_cmap('viridis')
-SEL_COLORS = {0.01: VIRIDIS_CMAP(0.8), 0.02: VIRIDIS_CMAP(0.5), 0.05: VIRIDIS_CMAP(0.2)}
+SEL_COLORS = {0.0: VIRIDIS_CMAP(1.0), 0.01: VIRIDIS_CMAP(0.8), 0.02: VIRIDIS_CMAP(0.6), 0.03: VIRIDIS_CMAP(0.4), 0.04: VIRIDIS_CMAP(0.2), 0.05: VIRIDIS_CMAP(0.0)}
 SEL_LABELS = {0.01: "Weak Selection", 0.02: "Moderate Selection", 0.05: "Strong Selection"}
-SEL_ZORDER = {0.01: 2, 0.02: 3, 0.05: 4}
+SEL_ZORDER = {0.0: 2, 0.01: 3, 0.02: 4, 0.03: 5, 0.04: 6, 0.05: 7}
 
 # tool comparison
 TAB_CMAP = plt.get_cmap("tab10")
-TOOL_LABELS = {"SweepLink": 'sweepLink', "bmws": 'bmws', "diplo-locus": "diplolocus", "ApproxWF": "approxwf_quick"}
-TOOL_COLORS =  {"SweepLink": TAB_CMAP(0), "bmws": TAB_CMAP(1), "diplo-locus": TAB_CMAP(2), "ApproxWF": TAB_CMAP(3)}
-TOOL_ZORDER = {"SweepLink": 4, "bmws": 3, "diplo-locus": 2, "ApproxWF": 1}
+TOOL_LABELS = {"sweeplink": 'SweepLink', "bmws": 'bmws', "diplolocus": "diplo-locus", "approxwf": "ApproxWF"}
+TOOL_COLORS =  {"sweeplink": TAB_CMAP(0), "bmws": TAB_CMAP(1), "diplolocus": TAB_CMAP(2), "approxwf": TAB_CMAP(3)}
+TOOL_ZORDER = {"sweeplink": 4, "bmws": 3, "diplolocus": 2, "approxwf": 1}
 
 
 # --- CHARACTERISTICS ---
@@ -175,6 +179,15 @@ characteristics_list = [
         'title': 'across grid sizes',
         'can_reuse_simulation': True,
     },
+    {
+        'name': 'comparison',
+        'values': ["sweeplink", "approxwf", "diplolocus", "bmws"],
+        'x_label': 'Tool Name',
+        'xlog': False,
+        'default_value': "sweeplink",
+        'title': 'across tools',
+        'can_reuse_simulation': True,
+    },
 ]
 for i in range(len(characteristics_list)):
     if "val2str" not in characteristics_list[i]:
@@ -212,27 +225,61 @@ def get_experiment_dir(char_name):
 def get_comparison_dir():
     return os.path.join(BASE_EXP_DIR, "tools_comparison")
 
-def get_inference_dir_for_comparison(tool_name):
-    assert tool_name in THRESHOLDS
-    return os.path.join(get_comparison_dir(), tool_name)
+def get_inference_dir(char_name):
+    return os.path.join(get_experiment_dir(char_name), "inference")
 
-def get_inference_dir(char_name, tool_name="sweeplink", is_comparison=False):
-    if is_comparison:
-        return get_inference_dir_for_comparison(tool_name)
-    return os.path.join(get_experiment_dir(char_name), "sweeplink_inference")
-
-def get_inference_dir_for_val(char_name, char_val, tool_name, is_comparison=False):
-    if is_comparison:
-        return os.path.join(get_inference_dir(char_name, tool_name, is_comparison), "results")
-    return os.path.join(get_inference_dir(char_name, tool_name, is_comparison=False), f"val_{characteristics[char_name]['val2str'][char_val]}")
+def get_inference_dir_for_val(char_name, char_val):
+    return os.path.join(get_inference_dir(char_name), f"val_{characteristics[char_name]['val2str'][char_val]}")
 
 def get_simulation_dir(char_name):
     return os.path.join(get_experiment_dir(char_name), "simulation")
 
+def get_sim_char_name_val(char_name, char_val):
+    if char_name == "comparison":
+        sim_char_name = "sample_size"
+        return sim_char_name, get_char_config(sim_char_name)["default_value"]
+    return char_name, char_val
+
+def get_sel_list(char_name):
+    if char_name == "comparison":
+        return SIM_COMPARE_LIST
+    return SIM_MAIN_LIST
+
+def get_tool_name(char_name, char_val):
+    if char_name == "comparison":
+        return char_val
+    return "sweeplink"
+
+def get_counts_filename(char_name, char_val):
+    from . import comparison
+    tool_name = get_tool_name(char_name, char_val)
+    return comparison.get_tool_input_file(tool_name=tool_name)
+
+def get_generation_func_meta(char_name, char_val):
+    from . import comparison
+    tool_name = get_tool_name(char_name, char_val)
+    return comparison.get_generation_func_meta_for_tool(tool_name=tool_name)
+
+def get_generation_func_counts_header(char_name, char_val):
+    from . import comparison
+    tool_name = get_tool_name(char_name, char_val)
+    return comparison.get_generation_func_counts_header(tool_name=tool_name)
+
+def get_generation_func_counts_line(char_name, char_val):
+    from . import comparison
+    tool_name = get_tool_name(char_name, char_val)
+    return comparison.get_generation_func_counts_line(tool_name=tool_name)
+
+def get_generation_func_cmd(char_name, char_val):
+    from . import comparison
+    tool_name = get_tool_name(char_name, char_val)
+    return comparison.get_generation_func_cmd(tool_name=tool_name)
+
 def get_data_dir_name(char_name, char_val):
-    if characteristics[char_name]["can_reuse_simulation"]:
+    sim_char_name, sim_char_val = get_sim_char_name_val(char_name, char_val)
+    if characteristics[sim_char_name]["can_reuse_simulation"]:
         return "data"
-    return f"data_{characteristics[char_name]['val2str'][char_val]}"
+    return f"data_{get_char_config(sim_char_name)['val2str'][sim_char_val]}"
 
 def get_data_dir(char_name, char_val, sel_coef):
     #sim_dir = get_simulation_dir(char_name)
@@ -244,10 +291,12 @@ def get_data_dir(char_name, char_val, sel_coef):
     return os.path.join(sim_dir, f"sel_{sel_coef}", data_dir_name)
 
 def get_path_to_log_file(char_name, char_val, sel_coef, scenario, ind):
-    return os.path.join(get_data_dir(char_name, char_val, sel_coef), "logs", scenario, f"{ind}.log")
+    sim_char_name, sim_char_val = get_sim_char_name_val(char_name, char_val)
+    return os.path.join(get_data_dir(sim_char_name, sim_char_val, sel_coef), "logs", scenario, f"{ind}.log")
 
 def get_path_to_vcf_file(char_name, char_val, sel_coef, scenario, ind):
-    return os.path.join(get_data_dir(char_name, char_val, sel_coef), "vcfs", scenario, str(ind), "merged.vcf")
+    sim_char_name, sim_char_val = get_sim_char_name_val(char_name, char_val)
+    return os.path.join(get_data_dir(sim_char_name, sim_char_val, sel_coef), "vcfs", scenario, str(ind), "merged.vcf")
 
 def get_correct_n_grid(char_name, char_val):
     if char_name != "n_grid":
@@ -271,3 +320,15 @@ def get_dir_for_master_plots():
 
 def get_filename_to_save_master_plot(char_name):
     return os.path.join(get_dir_for_master_plots(), f"{char_name}_master_plot.pdf")
+
+def get_dir_for_mcc_plots():
+    return os.path.join(get_plotting_base_dir(), "power_plots")
+
+def get_filename_to_save_mcc_plot(char_name):
+    return os.path.join(get_dir_for_mcc_plots(), f"{char_name}_power_plot.pdf")
+
+def get_dir_for_boxplot_plots():
+    return os.path.join(get_plotting_base_dir(), "boxplot_plots")
+
+def get_filename_to_save_boxplot_plot(char_name):
+    return os.path.join(get_dir_for_boxplot_plots(), f"{char_name}_boxplot_plot.pdf")

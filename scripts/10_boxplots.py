@@ -9,7 +9,7 @@ parser.add_argument('--out', type=str, default=None)
 args = parser.parse_args()
 if args.out is None:
     os.makedirs(config.get_plotting_base_dir(), exist_ok=True)
-    os.makedirs(config.get_dir_for_master_plots(), exist_ok=True)
-    args.out = config.get_filename_to_save_master_plot(args.char)
+    os.makedirs(config.get_dir_for_boxplot_plots(), exist_ok=True)
+    args.out = config.get_filename_to_save_boxplot_plot(args.char)
 
-plotting.draw_master_plot(args.char, save_file=args.out, n_total=args.n_total)
+plotting.draw_absolute_boxplots(args.char, save_file=args.out, n_total=args.n_total)
