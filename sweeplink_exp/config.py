@@ -191,6 +191,12 @@ def get_char_config(char_name):
 def get_defaults():
     return {c['name']: c['default_value'] for c in characteristics}
 
+def get_char_name_for_comp():
+    return "sample_size"
+
+def get_char_val_for_comp():
+    return characteristics["sample_size"]["default_value"]
+
 def is_finished_sweeplink(directory):
     check_file = os.path.join(directory, "sweepLink_meanVar.txt")
     if not os.path.exists(check_file):

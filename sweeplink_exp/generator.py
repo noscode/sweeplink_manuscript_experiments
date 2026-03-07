@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import subprocess
-from . import config
+from . import config, comparison
 
 def get_timepoints_from_simulation(char_name, char_val, sel_scenario_el, ind):
     """
@@ -61,10 +61,11 @@ def read_counts_generator(vcf_file, n_timepoints, n_sample):
 
 def get_sweeplink_command(char_name, char_val, time_points):
     numGrid = str(config.get_correct_n_grid(char_name, char_val))
+    meta_file, input_file = comparison.get_files_to_check("sweeplink")
     return [
             config.SWEEPLINK_PATH, "infer",
-            "--meta", "sweepLink_meta.txt",
-            "--counts", "sweepLink_alleleCounts.txt",
+            "--meta", meta_file,
+            "--counts", input_file,
             "--nGridPoints", numGrid,
             "--numThreads", "1",
             "--numBurnin", "10",
@@ -84,7 +85,7 @@ def get_approxwf_command(char_name, char_val, time_points):
     return [
             config.APPROXWF_PATH,
             "task=estimate",
-            "loci=approxwf.loci",
+            f"loci={comparison.get_tool_input_file('approxwf')}",
             "h=0.5",
             "mutRate=1e-8",
             "verbose=1",
@@ -94,7 +95,7 @@ def get_approxwf_command(char_name, char_val, time_points):
 def get_diplolocus_command(char_name, char_val, time_points):
     return [
             "DiploLocus", "likelihood",
-            "--infile", "diplolocus_alleleCounts.txt",
+            "--infile", comparison.get_tool_input_file("diplolocus"),
             "--sample_times", ",".join([str(_x) for _x in time_points]),
             "--fix_h", "0.5",
             '--fix_s2=' + f'{",".join([str(s) for s in sorted(list(set(config.SWEEPLINK_GRID)))])}',
@@ -111,7 +112,7 @@ def get_diplolocus_command(char_name, char_val, time_points):
 def get_bmws_command(char_name, char_val, time_points):
     return [
             "bmws", "analyze",
-            "prepared_data.vcf",
+            comparison.get_tool_input_file("bmws"),
             "meta_file.meta",
             "-l", "4.5",
             "-d", "diploid",
@@ -155,7 +156,9 @@ def generate_files(inference_dir, char_name, char_val, ind, tp_func, counts_file
                 if 0 < np.sum(ac) < np.sum(tc):
                     written += 1
                     sel, scenario = comb["true_s"], comb["scenario"]
-                    f.write(get_ac_line_func(line, sel, scenario, i_chrom, pos, ac, tc).strip() + "\n")
+                    line = get_ac_line_func(line, sel, scenario, i_chrom, pos, ac, tc).strip()
+                    if line!= "":
+                        f.write(line + "\n")
         assert written > 0
 
     # 3. Generate cmd file
@@ -206,9 +209,11 @@ def generate_approxwf_files(char_name, char_val, ind):
         return "time\t" + "\t".join([str(time) for time in time_points])
 
     def get_ac_line(line, sel, scenario, i_chrom, pos, ac, tc):
-        line = f"{config.get_chrom_name(i_chrom + 1, sel, scenario)}_{pos}\t"
-        line += "\t".join(f"{_1}/{_2}" for _1, _2 in zip(ac, tc)) + "\n"
-        return line
+        if scenario == "neut" or pos == config.get_chrom_middle_pos(config.get_char_name_for_comp(), config.get_char_val_for_comp()):
+            line = f"{config.get_chrom_name(i_chrom + 1, sel, scenario)}_{pos}\t"
+            line += "\t".join(f"{_1}/{_2}" for _1, _2 in zip(ac, tc)) + "\n"
+            return line
+        return ""
 
     generate_files(
         inference_dir=inference_dir,
@@ -273,9 +278,11 @@ def generate_bmws_files(char_name, char_val, ind):
         return header
 
     def get_ac_line(line, sel, scenario, i_chrom, pos, ac, tc):
-        line = line.split()
-        line[0] = f"{config.get_chrom_name(i_chrom + 1, sel, scenario)}"
-        return "\t".join(line)
+        if scenario == "neut" or pos == config.get_chrom_middle_pos(config.get_char_name_for_comp(), config.get_char_val_for_comp()):
+            line = line.split()
+            line[0] = f"{config.get_chrom_name(i_chrom + 1, sel, scenario)}"
+            return "\t".join(line)
+        return ""
 
     generate_files(
         inference_dir=inference_dir,
@@ -291,8 +298,8 @@ def generate_bmws_files(char_name, char_val, ind):
     )
 
 def generate_files_for_comparison(tool_name, ind):
-    char_name = "sample_size"
-    char_val = config.characteristics[char_name]["default_value"]
+    char_name = config.get_char_name_for_comp()
+    char_val = config.get_char_val_for_comp()
     if tool_name == "sweeplink":
         return generate_sweeplink_files(char_name, char_val, ind, is_comparison=True)
     if tool_name == "diplolocus":

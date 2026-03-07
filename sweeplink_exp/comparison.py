@@ -3,8 +3,8 @@ from . import config
 
 def is_finished(tool_name, ind, char_name=None, char_val=None, is_comparison=False):
     if char_name is None:
-        char_name = "sample_size"
-        char_val = config.get_char_config()["default_value"]
+        char_name = config.get_char_name_for_comp()
+        char_val = config.get_char_val_for_comp()
     if not is_comparison:
         assert tool_name == "sweeplink"
     
@@ -21,7 +21,7 @@ def is_finished(tool_name, ind, char_name=None, char_val=None, is_comparison=Fal
     return is_finished_bmws(run_dir)
 
 def is_finished_approxwf(directory):
-    check_file = os.path.join(directory, "approxwf_MCMC_output.txt")
+    check_file = os.path.join(directory, get_tool_output_file("approxwf"))
     if not os.path.exists(check_file):
         return False
     with open(check_file, "r") as f:
@@ -29,17 +29,42 @@ def is_finished_approxwf(directory):
     return num_lines == 100002
 
 def is_finished_diplolocus(directory):
-    check_file = os.path.join(directory, "diplolocus_result_off-grid_maxLLs.txt")
+    check_file = os.path.join(directory, get_tool_output_file("diplolocus"))
     if not os.path.exists(check_file):
         return False
     with open(check_file, "r") as f:
         num_lines = len(f.readlines())
     return num_lines > 20
 
-def is_finished_diplolocus(directory):
-    check_file = os.path.join(directory, "results.txt")
+def is_finished_bmws(directory):
+    check_file = os.path.join(directory, get_tool_output_file("bmws"))
     if not os.path.exists(check_file):
         return False
     with open(check_file, "r") as f:
         num_lines = len(f.readlines())
     return num_lines > 20
+
+def get_tool_input_file(tool_name):
+    if tool_name == "sweeplink":
+        return "sweepLink_alleleCounts.txt"
+    if tool_name == "approxwf":
+        return "approxwf.loci"
+    if tool_name == "diplolocus":
+        return "diplolocus_alleleCounts.txt"
+    assert tool_name == "bmws"
+    return "prepared_data.vcf"
+
+def get_tool_output_file(tool_name):
+    if tool_name == "sweeplink":
+        return "sweepLink_s_statePosteriors.txt"
+    if tool_name == "approxwf":
+        return "approxwf_MCMC_output.txt"
+    if tool_name == "diplolocus":
+        return "diplolocus_result_off-grid_maxLLs.txt"
+    assert tool_name == "bmws"
+    return "results.txt"
+
+def get_files_to_check(tool_name):
+    if tool_name == "sweeplink":
+        return ["sweepLink_meta.txt", get_tool_input_file(tool_name)]
+    return [get_tool_input_file(tool_name)]

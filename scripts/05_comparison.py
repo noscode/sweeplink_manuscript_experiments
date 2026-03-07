@@ -1,0 +1,29 @@
+import sys, os, argparse
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from sweeplink_exp import config, generator, slurm
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--tool', type=str, required=True)
+parser.add_argument('--n_start', type=int, default=0)
+parser.add_argument('--n_sim', type=int, default=100)
+parser.add_argument('--n_cores', type=int, default=20)
+parser.add_argument('--submit', action='store_true')
+parser.add_argument('--skip_generation', action='store_true')
+args = parser.parse_args()
+
+
+if not args.skip_generation:
+    print(f"Generating for {args.tool} (Sims {args.n_start} to {args.n_start+args.n_sim-1})")
+    for i in range(args.n_start, args.n_start + args.n_sim):
+        generator.generate_files_for_comparison(args.tool, i)
+
+slurm.generate_inference_slurm(
+    char_name="sample_size",
+    char_values=[config.get_char_config("sample_size")["default_value"]],
+    n_start=args.n_start,
+    n_sim=args.n_sim,
+    n_cores=args.n_cores,
+    tool_name=args.tool,
+    is_comparison=True,
+    submit=args.submit,
+)

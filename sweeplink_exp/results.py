@@ -84,6 +84,7 @@ def parse_sweeplink_trace_file(filepath):
     if not os.path.exists(filepath):
         return []
     df =  pd.read_csv(filepath, header=0, sep="\t", on_bad_lines='skip')
+    df = df.apply(pd.to_numeric, errors='coerce').dropna()
     return df.to_dict(orient="list")
 
 

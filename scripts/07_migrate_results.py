@@ -4,11 +4,12 @@ import argparse
 import shutil
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from sweeplink_exp import config
+from sweeplink_exp import config, comparison
 
 def compare_files_robust(f1, f2):
     """Compares two files line by line, stripping whitespace to avoid failing on trailing spaces/newlines."""
     if not os.path.exists(f1) or not os.path.exists(f2):
+        print(f1, f2)
         return False
     with open(f1) as file1, open(f2) as file2:
         # Strip newlines and spaces, and ignore completely blank lines
@@ -19,31 +20,11 @@ def compare_files_robust(f1, f2):
         return False
     return l1 == l2
 
-parser = argparse.ArgumentParser(description="Migrate old sweepLink results to the new architecture.")
-parser.add_argument('--char', required=True, help="Name of characteristic")
-parser.add_argument('--old_dir', required=True, help="Path to the old root directory (e.g., ../new_round)")
-parser.add_argument('--n_sim', type=int, default=100, help="Number of simulations to check")
-args = parser.parse_args()
 
-char_values = config.get_char_config(args.char)['values']
-new_base_dir = config.get_inference_dir(args.char, tool_name="sweeplink", is_comparison=False)
-old_base_dir = os.path.join(args.old_dir, args.char, "inference")
-
-# We only strictly compare the data matrices. 
-# We ignore 'cmd' because the path to the executable might have changed in your new config!
-inputs_to_check = ["sweepLink_meta.txt", "sweepLink_alleleCounts.txt"]
-
-char_config = config.get_char_config(args.char)
-
-print(f"Starting migration from {old_base_dir} -> {new_base_dir} ...\n")
-
-for char_val in char_values:
-    old_val_dir = os.path.join(old_base_dir, char_config['val2str'][char_val])
-    new_val_dir = config.get_inference_dir_for_val(args.char, char_val, tool_name="sweeplink", is_comparison=False)
-    
+def migrate(old_val_dir, new_val_dir, info_string, inputs_to_check):
     if not os.path.exists(old_val_dir):
-        print(f"[{args.char}={char_val}] Skipped: Old directory does not exist.")
-        continue
+        print(f"[{info_string}] Skipped: Old directory ({old_val_dir}) does not exist.")
+        return
         
     migrated_count = 0
     mismatch_count = 0
@@ -85,6 +66,41 @@ for char_val in char_values:
         else:
             mismatch_count += 1
             
-    print(f"[{args.char}={char_val}] Migrated: {migrated_count} | Mismatched Inputs: {mismatch_count} | Missing Target Dir: {missing_new_count}")
+    print(f"[{info_string}] Migrated: {migrated_count} | Mismatched Inputs: {mismatch_count} | Missing Target Dir: {missing_new_count}")
 
-print("\nMigration complete! You can now run scripts/03_print_results.py directly.")
+parser = argparse.ArgumentParser(description="Migrate old sweepLink results to the new architecture.")
+parser.add_argument('--char', required=True, help="Name of characteristic")
+parser.add_argument('--old_dir', required=True, help="Path to the old root directory (e.g., ../new_round)")
+parser.add_argument('--n_sim', type=int, default=100, help="Number of simulations to check")
+args = parser.parse_args()
+
+if args.char == "comparison":
+    print(f"Starting migration ...\n")
+    for tool_name in config.THRESHOLDS:
+        if tool_name == "sweeplink":
+            continue
+        new_dir = config.get_inference_dir_for_val(args.char, "",  tool_name=tool_name, is_comparison=True)
+        tool2dir = {"sweeplink": "sweepLink", "approxwf": "approxwf_quick", "diplolocus": "diplolocus", "bmws": "bmws"}
+        old_dir = os.path.join(args.old_dir, "compare_tools", tool2dir[tool_name], "results")
+        print(f"Starting migration from {old_dir} -> {new_dir} ...\n")
+        inputs_to_check = comparison.get_files_to_check(tool_name)
+
+        migrate(old_dir, new_dir, info_string=f"tool {tool_name}", inputs_to_check=inputs_to_check)
+    
+else:
+    char_values = config.get_char_config(args.char)['values']
+    new_base_dir = config.get_inference_dir(args.char, tool_name="sweeplink", is_comparison=False)
+    old_base_dir = os.path.join(args.old_dir, args.char, "inference")
+
+    inputs_to_check = comparison.get_files_to_check("sweeplink")
+
+    char_config = config.get_char_config(args.char)
+
+    print(f"Starting migration from {old_base_dir} -> {new_base_dir} ...\n")
+
+    for char_val in char_values:
+        old_val_dir = os.path.join(old_base_dir, char_config['val2str'][char_val])
+        new_val_dir = config.get_inference_dir_for_val(args.char, char_val, tool_name="sweeplink", is_comparison=False)
+        migrate(old_val_dir, new_val_dir, info_string=f"{args.char}={char_val}", inputs_to_check=inputs_to_check)
+
+print("\nMigration complete!")
