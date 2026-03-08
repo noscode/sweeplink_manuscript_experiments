@@ -9,7 +9,9 @@ parser.add_argument('--sim', required=True, help="Simulation index")
 args = parser.parse_args()
 
 try:
-    args.val = int(args.val)
+    int_val = int(args.val)
+    assert int_val in config.get_char_config(args.char)["values"]
+    args.val = int_val
 except:
     args.val = float(args.val)
 
@@ -17,5 +19,4 @@ printing.process_and_print_intermediate_results(
     char_name=args.char,
     char_val=args.val,
     ind=args.sim,
-    is_comparison=False
 )

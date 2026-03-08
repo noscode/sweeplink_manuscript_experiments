@@ -14,16 +14,17 @@ def parse_sweeplink_s_trace_file(filepath, pos_of_sel):
 
     chrom2data = {}
     for key in data_dict:
-        is_neut = config.get_sel_from_chrom_name(key[2:]) == 0
+        chrom = key[2:]
+        is_neut = config.get_sel_from_chrom_name(chrom) == 0.0
         pos = int(key.split("_")[-2])
         if is_neut or pos == pos_of_sel:
             raw_array = np.array(data_dict[key], dtype=float)
             arr = raw_array[~np.isnan(raw_array)]
             probs = np.bincount(arr.astype(int), minlength=len(config.SWEEPLINK_GRID))
             probs = probs.astype(float) / np.sum(probs)
-            if key not in chrom2data:
-                chrom2data[key] = []
-            chrom2data[key].append(get_score_pred_s_from_probs(probs))
+            if chrom not in chrom2data:
+                chrom2data[chrom] = []
+            chrom2data[chrom].append(get_score_pred_s_from_probs(probs))
     return chrom2data
 
 def get_score_pred_s_from_probs(probs):
