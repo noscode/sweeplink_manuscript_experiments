@@ -74,7 +74,8 @@ parser.add_argument('--old_dir', required=True, help="Path to the old root direc
 parser.add_argument('--n_sim', type=int, default=100, help="Number of simulations to check")
 args = parser.parse_args()
 
-char_values = config.get_char_config(args.char)['values']
+char_config = config.get_char_config(args.char)
+char_values = char_config['values']
 
 for char_val in char_values:
     tool_name = config.get_tool_name(args.char, char_val)

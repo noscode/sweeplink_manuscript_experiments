@@ -70,26 +70,18 @@ def calculate_metrics(parsed_data, sel_list, threshold, score_is_pval=False):
 def get_error(y_pred, true_val):
     return (np.array(y_pred) - true_val) / true_val
 
-def get_TPR_per_sel_and_FPR(parsed_data, sel_list, threshold, score_is_pval=False, return_metrics=True):
+def get_TPR_per_sel_and_FPR(metrics_data, sel_list):
     assert 0.0 in sel_list
-    metrics = calculate_metrics(
-        parsed_data=parsed_data,
-        sel_list=sel_list,
-        threshold=threshold,
-        score_is_pval=score_is_pval
-    )
     # 2. get TPR for each s
     TPR = {}
     for sel in set(sel_list):
         if sel == 0.0:
-            FPR = metrics[sel]["n_sig"] / metrics[sel]["n_total"] if metrics[sel]["n_total"] > 0 else 0
+            FPR = metrics_data[sel]["n_sig"] / metrics_data[sel]["n_total"] if metrics_data[sel]["n_total"] > 0 else 0
         else:
-            TPR[sel] = metrics[sel]["n_sig"] / metrics[sel]["n_total"] if metrics[sel]["n_total"] > 0 else 0
-    if return_metrics:
-        return TPR, FPR, metrics
-    return TPN, FPR
+            TPR[sel] = metrics_data[sel]["n_sig"] / metrics_data[sel]["n_total"] if metrics_data[sel]["n_total"] > 0 else 0
+    return TPR, FPR
 
-def get_MCC(parsed_data, sel_list, threshold, score_is_pval=False, return_metrics=False):
+def get_MCC(parsed_data, sel_list, threshold, score_is_pval=False, return_FPR=False):
     assert 0.0 in sel_list
 
     metrics = calculate_metrics(
@@ -114,7 +106,9 @@ def get_MCC(parsed_data, sel_list, threshold, score_is_pval=False, return_metric
 
     # Handle edge case: if denominator is 0, MCC is defined as 0
     if denominator == 0:
+        if return_FPR:
+            return 0.0, FP / (FP + TN)
         return 0.0
-    if return_metrics:
-        return numerator / denominator, metrics
+    if return_FPR:
+        return numerator / denominator, FP / (FP + TN)
     return numerator / denominator

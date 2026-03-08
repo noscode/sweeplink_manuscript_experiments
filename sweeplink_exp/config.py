@@ -38,11 +38,16 @@ SIM_MAIN_LIST_WITH_0 = [0.0, 0.01, 0.02, 0.05]
 SIM_COMPARE_LIST = [0.01, 0.02, 0.03, 0.04, 0.05]
 COMPARE_SEL_LIST = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
 COMPARE_N_SIM = 100
+# Thresholds with similar FPR as sweeplink:
+# sweeplink FPR=0.00028831395693946257 at threshold=0.0
+# approxwf FPR=0.0002887736361221166 at threshold=0.14666708663439657
+# diplolocus FPR=0.00030032458156700124 at threshold=0.00027598263924661807
+# bmws FPR=0.00034518765263766516 at threshold=0.0033967385822722025
 THRESHOLDS = {
     'sweeplink': 1.00,    # Probability threshold
-    'approxwf': 0.847778096527895,     # Probability threshold
-    'diplolocus': 7.56463327554629e-05,  # P-value threshold
-    'bmws': 0.0031257158496882415,
+    'approxwf': 1 - 0.14666708663439657,     # Probability threshold
+    'diplolocus': 0.00027598263924661807,  # P-value threshold
+    'bmws': 0.0033967385822722025,
 }
 IS_PVAL = {
     'sweeplink': False,
@@ -100,7 +105,7 @@ def get_s_grid_bounds():
 # --- PLOTTING ---
 # For master plots (sweeplink only)
 VIRIDIS_CMAP = plt.get_cmap('viridis')
-SEL_COLORS = {0.0: VIRIDIS_CMAP(1.0), 0.01: VIRIDIS_CMAP(0.8), 0.02: VIRIDIS_CMAP(0.6), 0.03: VIRIDIS_CMAP(0.4), 0.04: VIRIDIS_CMAP(0.2), 0.05: VIRIDIS_CMAP(0.0)}
+SEL_COLORS = {0.0: VIRIDIS_CMAP(1.0), 0.01: VIRIDIS_CMAP(0.85), 0.02: VIRIDIS_CMAP(0.7), 0.03: VIRIDIS_CMAP(0.55), 0.04: VIRIDIS_CMAP(0.4), 0.05: VIRIDIS_CMAP(0.25)}
 SEL_LABELS = {0.01: "Weak Selection", 0.02: "Moderate Selection", 0.05: "Strong Selection"}
 SEL_ZORDER = {0.0: 2, 0.01: 3, 0.02: 4, 0.03: 5, 0.04: 6, 0.05: 7}
 
@@ -116,7 +121,7 @@ characteristics_list = [
     {
         'name': 'sample_size',
         'values': [5, 10, 25, 50, 100, 250, 500],
-        'x_label': 'Sample size',
+        'x_label': 'Sample Size',
         'xlog': False,
         'default_value': 25,
         'title': 'across Sample Sizes',
@@ -126,66 +131,66 @@ characteristics_list = [
         'name': 'n_loci',
         'values': [0.05, 0.1, 0.2, 0.5, 1.0],
         'val2str': {0.05: "50k", 0.1: "100k", 0.2: "200k", 0.5: "500k", 1.0: "1m"},
-        'x_label': 'Sequence length of one chromosome (Mb)',
+        'x_label': 'Sequence Length of One Chromosome (Mb)',
         'xlog': False,
         'default_value': 0.1,
-        'title': 'across sequence length',
+        'title': 'across Sequence Length',
         'can_reuse_simulation': False,
     },
     {
         'name': 'tpoints_num',
         'values': [6, 11, 21, 41],
         'val2str': {6: "5", 11: "10", 21: "20", 41: "40"},
-        'x_label': 'Number of time points',
+        'x_label': 'Number of Timepoints',
         'xlog': False,
         'default_value': 11,
-        'title': 'across number of time points',
+        'title': 'across Number of Timepoints',
         'can_reuse_simulation': False,
     },
     {
         'name': 'binning',
         'values': [2, 4, 8, 16, 32, 40, 80],
-        'x_label': 'Binning size (generations)',
+        'x_label': 'Binning Size (generations)',
         'xlog': False,
         'default_value': 16,
-        'title': 'across binning sizes',
+        'title': 'across Binning Sizes',
         'can_reuse_simulation': True,
     },
     {
         'name': 'start_freq',
         'values': [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-        'x_label': 'Initial frequency',
+        'x_label': 'Initial Frequency',
         'xlog': False,
         'default_value': 0.3,
-        'title': 'across initial frequencies',
+        'title': 'across Sweep Initial Frequencies',
         'can_reuse_simulation': False,
     },
     {
         'name': 'rec_rate',
         'values': [1e-9, 1e-8, 1e-7, 1e-6],
         'val2str': {1e-10: "10", 1e-9: "9", 1e-8: "8", 1e-7: "7", 1e-6: "6", 1e-5: "5"},
-        'x_label': 'Recombination rate (cM / Mb)',
+        'x_label': 'Recombination Rate (cM / Mb)',
         'xlog': True,
         'default_value': 1e-8,
-        'title': 'across recombination rates',
+        'title': 'across Recombination Rates',
         'can_reuse_simulation': False,
     },
     {
         'name': 'n_grid',
         'values': [10, 20, 50, 75, 100],
-        'x_label': 'Grid size',
+        'x_label': 'Grid Size in Diffusion',
         'xlog': False,
         'default_value': 50,
-        'title': 'across grid sizes',
+        'title': 'across Grid Sizes',
         'can_reuse_simulation': True,
     },
     {
         'name': 'comparison',
         'values': ["sweeplink", "approxwf", "diplolocus", "bmws"],
-        'x_label': 'Tool Name',
+        'x_label': 'Tool',
         'xlog': False,
         'default_value': "sweeplink",
-        'title': 'across tools',
+        'title': 'across Tools',
         'can_reuse_simulation': True,
     },
 ]
@@ -326,9 +331,3 @@ def get_dir_for_mcc_plots():
 
 def get_filename_to_save_mcc_plot(char_name):
     return os.path.join(get_dir_for_mcc_plots(), f"{char_name}_power_plot.pdf")
-
-def get_dir_for_boxplot_plots():
-    return os.path.join(get_plotting_base_dir(), "boxplot_plots")
-
-def get_filename_to_save_boxplot_plot(char_name):
-    return os.path.join(get_dir_for_boxplot_plots(), f"{char_name}_boxplot_plot.pdf")
