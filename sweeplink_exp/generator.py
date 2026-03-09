@@ -3,9 +3,11 @@ import numpy as np
 import subprocess
 from . import config, comparison
 
-def get_timepoints_from_simulation(char_name, char_val, sel_scenario_el, ind):
+
+def get_timepoints_and_nsamples_from_simulation(char_name, char_val, sel_scenario_el, ind):
     """
-    Returns timepoints sorted from past to present (forward in time)
+    Returns timepoints sorted from past to present (forward in time) and list of sample size
+    for each timepoint
     """
     log_path = config.get_path_to_log_file(
         char_name=char_name,
@@ -15,12 +17,40 @@ def get_timepoints_from_simulation(char_name, char_val, sel_scenario_el, ind):
         ind=ind,
     )
     with open(log_path) as f:
-        points = [int(x) for x in next(f).split("mpGens='c(")[1].split(")'")[0].split(",")]
-
+        line = next(f)
+        points = [int(x) for x in line.split("mpGens='c(")[1].split(")'")[0].split(",")]
+        samples_per_step = int(line.split('sampleSizePerStep=')[1].split()[0])
     assert points[0] == 0
-    return points
 
-def read_counts_generator(vcf_file, n_timepoints, n_sample):
+    n_sample_list = [samples_per_step for _ in points]
+
+    if char_name != "binning":
+        return points, n_sample_list
+
+    # If we have binning experiment we need to bin our samples
+    # The binning size is stored in char_val and we take the same time span
+    bin_size = char_val
+    assert points[-1] % bin_size == 0  # otherwise we cannot do binning
+    new_time_points = [i * bin_size for i in range(points[-1] // bin_size + 1)]
+
+    # now we will create and fill number of samples per each point
+    # it will be the same in the middle bins, but it will be less in first and last bins
+    new_n_samples = [0 for _ in new_time_points]
+    half_step = bin_size / 2.0
+    for old_num, old_time in zip(n_sample_list, points):
+        for i in range(len(new_time_points)):
+            if new_time_points[i] - half_step < old_time < new_time_points[i] + half_step:
+                new_n_samples[i] += old_num
+            # If we are on the border we split samples: half goes to one bin
+            # and another half to the next bin
+            if old_time == new_time_points[i] - half_step:
+                new_n_samples[i] += int(old_num / 2)
+            if old_time == new_time_points[i] + half_step:
+                new_n_samples[i] += old_num - int(old_num / 2)
+    assert(np.sum(n_sample_list) == np.sum(new_n_samples))
+    return new_time_points, new_n_samples
+
+def read_counts_generator(vcf_file, n_sample_list):
     repeated_positions = []
     cur_pos = 0
     with open(vcf_file) as g:
@@ -43,13 +73,14 @@ def read_counts_generator(vcf_file, n_timepoints, n_sample):
             pos = cur_pos
 
             vcf_data = line.strip().split()[9:]
-            if n_sample is None: n_sample = int(len(vcf_data) / n_timepoints)
+            assert len(vcf_data) == np.sum(n_sample_list)
 
             ac_list = []  # allele counts per timepoint
             tc_list = []  # total counts per timepoint
-            for i in range(n_timepoints):
+            for i, n_samples in enumerate(n_sample_list):
                 ac, tc = 0, 0
-                for el in vcf_data[i*n_sample : (i+1)*n_sample]:
+                start_ind = int(np.sum(n_sample_list[:i]))
+                for el in vcf_data[start_ind : start_ind + n_samples]:
                     if el[0] == "1": ac += 1
                     if el[0] in ["0", "1"]: tc += 1
                     if el[2] == "1": ac += 1
@@ -128,7 +159,7 @@ def generate_files(char_name, char_val, ind):
     os.makedirs(base_dir, exist_ok=True)
 
     # 1. Get time points from first combination
-    time_points = get_timepoints_from_simulation(
+    time_points, n_sample_list = get_timepoints_and_nsamples_from_simulation(
         char_name=char_name,
         char_val=char_val,
         sel_scenario_el=vcf_combinations[0],
@@ -162,7 +193,7 @@ def generate_files(char_name, char_val, ind):
         assert(os.path.exists(vcf_path))
         written = 0
         with open(counts_path, "a") as f:
-            for line, _chr, pos, ac, tc in read_counts_generator(vcf_path, n_timepoints=len(time_points), n_sample=None):
+            for line, _chr, pos, ac, tc in read_counts_generator(vcf_path, n_sample_list=n_sample_list):
                 if 0 < np.sum(ac) < np.sum(tc):
                     sel, scenario = comb["true_s"], comb["scenario"]
                     line = generate_counts_file_line(line, sel, scenario, i_chrom, pos, ac, tc).strip()

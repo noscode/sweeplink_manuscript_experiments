@@ -149,7 +149,7 @@ characteristics_list = [
     },
     {
         'name': 'binning',
-        'values': [2, 4, 8, 16, 32, 40, 80],
+        'values': [4, 8, 16, 32, 40, 80],
         'x_label': 'Binning Size (generations)',
         'xlog': False,
         'default_value': 16,
@@ -207,7 +207,7 @@ def get_char_config(char_name):
     return characteristics[char_name]
 
 def get_defaults():
-    return {c['name']: c['default_value'] for c in characteristics}
+    return {c['name']: c['default_value'] for c in characteristics_list}
 
 def get_char_name_for_comp():
     return "sample_size"

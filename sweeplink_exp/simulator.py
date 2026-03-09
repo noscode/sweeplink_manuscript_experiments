@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from . import config
 
-def generate_simulation_files(char_name, exp_dir, slim_template_path):
+def generate_simulation_files(char_name, slim_template_path):
     char_values = config.get_char_config(char_name)['values']
     defaults = config.get_defaults()
     sim_base_dir = config.get_simulation_dir(char_name)
@@ -29,7 +29,7 @@ def generate_simulation_files(char_name, exp_dir, slim_template_path):
             phys_len = int(params['n_loci'] * 1_000_000)
             sample_gens_list =[i * params['binning'] for i in range(tpoints_num)]
 
-            data_dir = config.get_data_dir(char_name, char_val)
+            data_dir = config.get_data_dir(char_name, char_val, sel)
 
             yaml_content = f"""#General
 work dir: ../{data_dir}
